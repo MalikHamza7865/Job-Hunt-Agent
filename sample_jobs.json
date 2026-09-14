@@ -1,0 +1,26 @@
+[
+  {
+    "id": "sample-001",
+    "title": "Backend Developer (FastAPI)",
+    "sourceEmployerName": "TechNova Labs",
+    "structuredLocation": { "fullAddress": "Lahore, Punjab", "countryCode": "PK" },
+    "description": "Build production REST APIs with FastAPI, PostgreSQL and Redis rate limiting. JWT auth, async architecture, CI/CD with GitHub Actions.",
+    "url": "https://www.indeed.com/viewjob?jk=sample-001"
+  },
+  {
+    "id": "sample-002",
+    "title": "AI Engineer - LangChain",
+    "sourceEmployerName": "NeuroMatrix",
+    "structuredLocation": { "fullAddress": "Remote", "countryCode": "US" },
+    "description": "Design document retrieval agents with LangChain and vector databases. RAG pipelines, prompt engineering, LLM API integration.",
+    "url": "https://www.indeed.com/viewjob?jk=sample-002"
+  },
+  {
+    "id": "sample-003",
+    "title": "Python Developer",
+    "sourceEmployerName": "DataForge",
+    "structuredLocation": { "fullAddress": "Karachi, Sindh", "countryCode": "PK" },
+    "description": "General Python development, data pipelines with Pandas, automation scripts, and internal dashboards.",
+    "url": "https://www.indeed.com/viewjob?jk=sample-003"
+  }
+]

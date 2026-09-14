@@ -1,0 +1,55 @@
+name: job-hunt-agent
+
+on:
+  schedule:
+    # Every 6 hours on the hour
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: job-hunt-check
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fetch-match-notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_MODEL: qwen/qwen3.8-27b
+      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+      ADZUNA_COUNTRY: gb
+      WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+      WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+      RECIPIENT_PHONE: ${{ secrets.RECIPIENT_PHONE }}
+      # Approved template for the 24-hour-window fallback.
+      # Uncomment when the template is approved in Meta:
+      # WHATSAPP_TEMPLATE_NAME: ${{ secrets.WHATSAPP_TEMPLATE_NAME }}
+      # WHATSAPP_TEMPLATE_LANG: en
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch new jobs (Adzuna)
+        run: python app/fetch_jobs.py
+
+      - name: Score new jobs (Groq)
+        run: python app/match_job.py --limit 30
+
+      - name: Notify via WhatsApp
+        run: python app/notify.py

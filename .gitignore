@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.indeed_tokens.json
+.indeed_tokens.json.tmp
