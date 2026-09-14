@@ -150,7 +150,7 @@ See `.env.example`. The essentials:
 SUPABASE_URL=                      # https://<project>.supabase.co
 SUPABASE_KEY=                      # Project Settings -> API -> service_role
 GROQ_API_KEY=
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=qwen/qwen3.8-27b
 FETCH_SOURCE=adzuna               # adzuna (default) | indeed | sample
 ADZUNA_APP_ID=
 ADZUNA_APP_KEY=
@@ -292,11 +292,46 @@ the free Meta sandbox number can only message **up to 5 approved recipient
 numbers** added in the Meta App Dashboard (error `131030` means the number is
 not whitelisted yet).
 
+**24-hour session window:** WhatsApp only allows *free-form* (type=text)
+messages while the recipient has messaged the business within the last 24 hours
+(errors `131049`/`131026`/`131007`). Outside that window only an **approved
+message template** can reach the user, so `notify.py` has a fallback: if the
+free-form send fails with a session-window error and `WHATSAPP_TEMPLATE_NAME` is
+set, it sends a short template message (count + top match title + score) instead
+and still marks the matches `sent`.
+
+### Schedule (Milestone 5 — GitHub Actions cron)
+
+The workflow `.github/workflows/job_check.yml` runs **every 6 hours** and executes
+`fetch_jobs.py` → `match_job.py --limit 30` → `notify.py`. It is guarded by a
+`concurrency` group (runs never overlap) and a 20-minute timeout.
+
+To enable it:
+
+1. Push this repo to GitHub.
+2. Add these **repository Secrets** (Settings → Secrets and variables →
+   Actions): `SUPABASE_URL`, `SUPABASE_KEY`, `GROQ_API_KEY`, `ADZUNA_APP_ID`,
+   `ADZUNA_APP_KEY`, `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
+   `RECIPIENT_PHONE`. `GROQ_MODEL` and `ADZUNA_COUNTRY=gb` are already set in
+   the workflow as non-secret env vars (override by editing the file).
+3. (Recommended) Approve a **message template** in Meta (WhatsApp → Message
+   templates → Create) so notifications survive the 24-hour window; then set the
+   `WHATSAPP_TEMPLATE_NAME` secret (and uncomment it in the workflow) — see
+   `.env.example`. Suggested body:
+
+   ```
+   New job matches ready: {{1}} new match(es). Top pick: {{2}} ({{3}}% match).
+   Reply in WhatsApp for tailoring tips.
+   ```
+
+4. Run once with **workflow_dispatch** (Actions → job-hunt-agent → Run workflow)
+   to verify end-to-end before relying on the schedule.
+
 ---
 
 ## WhatsApp message formats
 
-**Notification (outbound, batched):**
+**Notification (outbound, batched, within 24h window):**
 
 ```
 🎯 2 new matches found (last 6 hours)
@@ -306,6 +341,13 @@ not whitelisted yet).
    🔗 https://www.indeed.com/viewjob?jk=...
 
 Reply with a number for tailored resume tips.
+```
+
+**Notification (template fallback, outside the 24h window):**
+
+```
+New job matches ready: 2 new match(es). Top pick: Backend Developer (82% match).
+Reply in WhatsApp for tailoring tips.
 ```
 
 **On-demand detail (reply to a number):**
@@ -359,9 +401,9 @@ partner-style data agreement) — not a session-scraper MCP.
 |---|----------------------------------------|-------------------|
 | 1 | Project scaffold + resume ingestion    | ✅ Done           |
 | 2 | Job fetch + dedupe (Adzuna live default, Indeed GraphQL backend) | ✅ Done (revised ×2) |
-| 3 | LLM matching engine (Groq)             | ✅ Done (needs live key) |
-| 4 | WhatsApp notifications (outbound)      | ✅ Done (needs recipient whitelist in Meta dashboard) |
-| 5 | GitHub Actions cron                    | ⬜ Pending        |
+| 3 | LLM matching engine (Groq)             | ✅ Done           |
+| 4 | WhatsApp notifications (outbound + template fallback) | ✅ Done |
+| 5 | GitHub Actions cron (every 6h)         | ✅ Done (enable: push repo + add secrets) |
 | 6 | Webhook for replies (Render)           | ⬜ Pending        |
 | 7 | Polish for portfolio (README/GIF/demo) | ⬜ Pending        |
 
