@@ -92,6 +92,7 @@ reach your phone, plus per-role tailoring tips generated only when you ask.
 ```
 job-hunt-agent/
 ├── .github/workflows/job_check.yml   # cron: fetch -> match -> notify
+├── render.yaml                       # Render blueprint for the replies webhook
 ├── app/
 │   ├── db.py                # Supabase client setup (reads .env)
 │   ├── ingest_resume.py     # PDF/text -> resume table
@@ -327,6 +328,56 @@ To enable it:
 4. Run once with **workflow_dispatch** (Actions → job-hunt-agent → Run workflow)
    to verify end-to-end before relying on the schedule.
 
+### Replies webhook (Milestone 6 — Render free tier)
+
+`app/webhook_app.py` is a FastAPI app that receives your WhatsApp replies and
+answers them (tailored tips via Groq, status/list/applied/pause). Deploy it on
+**Render free tier**:
+
+1. **Deploy the service**
+
+   - **Blueprint (easiest):** create a Render blueprint app from this repo
+     (New → Blueprint). `render.yaml` is bundled, so Render fills in the repo
+     and env vars; fill each `sync: false` var in the dashboard.
+   - **Or Web Service:** New → Web Service → repo → Runtime **Python**,
+     Build command `pip install -r requirements.txt`, Start command
+     `uvicorn app.webhook_app:app --host 0.0.0.0 --port $PORT`, Health Check
+     Path `/health`. Set env vars: `SUPABASE_URL`, `SUPABASE_KEY`,
+     `GROQ_API_KEY`, `GROQ_MODEL` (qwen/qwen3.8-27b), `WHATSAPP_TOKEN`,
+     `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`,
+     `WHATSAPP_APP_SECRET`, `RECIPIENT_PHONE`.
+
+   Free tier sleeps after ~15 min of inactivity; when you message the bot on
+   WhatsApp it wakes up with a ~30-60s cold start, then replies. If it is
+   sleeping, the webhook accepts the request (200) and the reply just takes a
+   few extra seconds.
+
+2. **Point Meta at the webhook** (Meta App Dashboard → WhatsApp →
+   **Configuration**):
+
+   - Callback URL: `https://<your-service>.onrender.com/webhook`
+   - Verify token: `WHATSAPP_VERIFY_TOKEN` value from the env above.
+   - Webhook fields: subscribe to **messages** (the `messages` field).
+   - Verify + subscribe. Render logs will show
+     `POST /webhook` … `queued N inbound message(s)`.
+
+3. **Optional hardening:** with `WHATSAPP_APP_SECRET` set, inbound requests are
+   signature-checked (`X-Hub-Signature-256`); unverified requests get 403.
+   Without it the app still works but anyone knowing the URL could inject fake
+   messages (they would still be ignored unless they come from
+   `RECIPIENT_PHONE`).
+
+#### Reply commands
+
+| You type            | What the bot does                                                            |
+|---------------------|-----------------------------------------------------------------------------|
+| `1` (a number)      | Tailored application tips for match #1 (the numbering in your latest WhatsApp notification or `list`), saved to that match |
+| `list`              | Numbered summary of your most recent matches                                |
+| `status`            | Counts: jobs scanned, pending/sent/applied, and whether notifications are ON/Paused |
+| `applied 1`         | Mark match #1 as `applied` (shows in `status`)                              |
+| `pause` / `resume`  | Mute / unmute the 6-hour notifications (cron respects this flag at `preferences.notifications_enabled`) |
+| `help`              | List of commands                                                             |
+
 ---
 
 ## WhatsApp message formats
@@ -403,8 +454,8 @@ partner-style data agreement) — not a session-scraper MCP.
 | 2 | Job fetch + dedupe (Adzuna live default, Indeed GraphQL backend) | ✅ Done (revised ×2) |
 | 3 | LLM matching engine (Groq)             | ✅ Done           |
 | 4 | WhatsApp notifications (outbound + template fallback) | ✅ Done |
-| 5 | GitHub Actions cron (every 6h)         | ✅ Done (enable: push repo + add secrets) |
-| 6 | Webhook for replies (Render)           | ⬜ Pending        |
+| 5 | GitHub Actions cron (every 6h)         | ✅ Done           |
+| 6 | Webhook for replies (Render)           | ✅ Done (enable: deploy render.yaml + set Meta webhook) |
 | 7 | Polish for portfolio (README/GIF/demo) | ⬜ Pending        |
 
 ---
